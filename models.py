@@ -44,6 +44,9 @@ def load_services(services):
 			print(f'In DB => {service["name"]} & {service["duration"]}')
 
 def load_employees(employees):
+
+
+
 	mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
 	cursor = mydb.cursor()
 	timestamp = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
@@ -52,7 +55,7 @@ def load_employees(employees):
 		cursor.execute(f'SELECT id FROM Users WHERE name="{employee}" AND role="employee"')
 		ids = cursor.fetchall()
 		if not ids:
-			cursor.execute(f'INSERT INTO Users (name, role, timestamp) VALUES ("{employee}", "employee", {timestamp})')
+			cursor.execute(f'INSERT INTO Users (name, role, timestamp) VALUES ("{employee}", "employee", "{timestamp}")')
 			mydb.commit()
 			if not cursor.rowcount:
 				print(f'Fail > Employee : {employee}')
@@ -277,8 +280,12 @@ def duration_in_secs(duration_str):
 
 def workorder_setter(start_date, duration_in_secs, service_id, customer_id, employee_id):
 
+
+
 	if not duration_in_secs:
-		return
+		return {"inserted": True, "message": "Inserted WorkOrder"}
+
+
 
 	for holiday in initial_holidays:
 		date_obj = datetime.strptime(holiday["date"], "%Y-%m-%d")
@@ -298,25 +305,30 @@ def workorder_setter(start_date, duration_in_secs, service_id, customer_id, empl
 		workorder_setter(start_date, duration_in_secs, service_id, customer_id, employee_id)
 
 
-
+	last_workorder_sql = f'SELECT * FROM WorkOrders ORDER BY id DESC LIMIT 1'
 	mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
 	cursor = mydb.cursor()
 	# last_workorder_sql = f'SELECT TOP 1 * FROM WorkOrders ORDER BY id DESC'
-	last_workorder_sql = f'SELECT * FROM WorkOrders ORDER BY id DESC LIMIT 1'
-
 
 	cursor.execute(last_workorder_sql)
-	last_workorder = cursor.fetchall()
+	last_workorder = []
+	try:
+		last_workorder = cursor.fetchall()[0]
+	except Exception:
+		pass
 
-	
+
 
 	if last_workorder:
-		date_time_last_workorder = datetime.fromisoformat(last_workorder["startTime"]) + prime_date.timedelta(seconds=int(last_workorder["duration"]))
+		# date_time_last_workorder = datetime.fromisoformat(last_workorder["startTime"]) + prime_date.timedelta(seconds=int(last_workorder["duration"]))
+		date_time_last_workorder = datetime.fromisoformat(last_workorder[1]) + prime_date.timedelta(seconds=int(last_workorder[2]))
+		
 		if date_time_last_workorder >= start_date:
 			start_date = date_time_last_workorder + prime_date.timedelta(minutes=1)
 	if start_date.hour >= 17:
 		start_date += prime_date.timedelta(days=1)
 		start_date = datetime.strptime(start_date.strftime("%Y-%m-%d") + " 9:0:0", "%Y-%m-%d %H:%M:%S")
+
 
 	next_start_time = None
 	new_duration = None
@@ -326,12 +338,17 @@ def workorder_setter(start_date, duration_in_secs, service_id, customer_id, empl
 	if check_remaining_time.hour >= 17 and check_remaining_time.minute > 0:
 
 
+
+
+
+
+
 		today_last_time = datetime.strptime(start_date.strftime("%Y-%m-%d") + " 17:0:0", "%Y-%m-%d %H:%M:%S") - start_date
 		new_duration = duration_in_secs - int(today_last_time.total_seconds())
 		next_start_time = start_date + prime_date.timedelta(days=1)
 		next_start_time = datetime.strptime(next_start_time.strftime("%Y-%m-%d") + " 9:0:0", "%Y-%m-%d %H:%M:%S")
 
-		sql = f'INSERT INTO WorkOrders (startTime, duration, ServiceId, CustomerId, EmployeeId) VALUES ("{start_date.isoformat()}", "{int(today_last_time.total_seconds())}" "{service_id}", "{customer_id}", "{employee_id}")'
+		sql = f'INSERT INTO WorkOrders (startTime, duration, ServiceId, CustomerId, EmployeeId) VALUES ("{start_date.isoformat()}", "{int(today_last_time.total_seconds())}", "{service_id}", "{customer_id}", "{employee_id}")'
 
 		mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
 		cursor = mydb.cursor()
@@ -346,7 +363,10 @@ def workorder_setter(start_date, duration_in_secs, service_id, customer_id, empl
 		workorder_setter(next_start_time, new_duration, service_id, customer_id, employee_id)
 
 	else:
-		sql = f'INSERT INTO WorkOrders (startTime, duration, ServiceId, CustomerId, EmployeeId) VALUES ("{start_date.isoformat()}", "{duration_in_secs}" "{service_id}", "{customer_id}", "{employee_id}")'
+
+
+
+		sql = f'INSERT INTO WorkOrders (startTime, duration, ServiceId, CustomerId, EmployeeId) VALUES ("{start_date.isoformat()}", "{duration_in_secs}", "{service_id}", "{customer_id}", "{employee_id}")'
 
 		mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
 		cursor = mydb.cursor()
@@ -357,10 +377,7 @@ def workorder_setter(start_date, duration_in_secs, service_id, customer_id, empl
 			print(f'Fail > WorkOrder')
 		else:
 			print(f'Inserted > WorkOrder')
-
-		workorder_setter(start_date, 0, service_id, customer_id, employee_id)
-
-
+			return {"inserted": True, "message": "Inserted WorkOrder"}
 
 
 def create_workorder(req):
@@ -400,6 +417,76 @@ def create_workorder(req):
 	# workorder_setter(start_date, duration_in_secs, service_id, customer_id, employee_id):
 	return workorder_setter(order_info["startTime"], duration_in_secs_, order_info["serviceId"], customer["id"], order_info["employeeId"])
 
+
+def get_workorders(req):
+	# sql = f'SELECT * FROM WorkOrders INNER JOIN Users u ON u.id=WorkOrders.EmployeeId INNER JOIN Services ON WorkOrders.ServiceId=Services.id INNER JOIN Users ON Users.name="{req.get("email")}"',
+	req_date = req.get("date")[:req.get("date").index(".")]
+
+	lower_boundary = datetime.fromisoformat(req_date).strftime("%Y-%m-%d")
+	upper_boundary = datetime.fromisoformat(req_date).strftime("%Y-%m-%d")+"T18"
+
+	sql = f'SELECT WorkOrders.*,Services.*,Users.* FROM WorkOrders,Services,Users WHERE WorkOrders.startTime>"{lower_boundary}" AND WorkOrders.startTime<"{upper_boundary}" AND WorkOrders.ServiceId=Services.id AND WorkOrders.EmployeeId=Users.id'
+	cust_sql = f'SELECT * FROM Users WHERE name="{req.get("email")}" LIMIT 1'
+
+	mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
+	cursor = mydb.cursor()
+	cursor.execute(sql)
+	workorders = cursor.fetchall()
+
+	cursor.execute(cust_sql)
+	customer = cursor.fetchone()
+
+	if not customer:
+		customer = (create_user(req.get("email")), req.get("email"), "customer")
+
+	return [
+		{
+            "service": work_order[6],
+            "workOrderID": work_order[0],
+            "description": work_order[7],
+            "start": datetime.fromisoformat(work_order[1]).hour + datetime.fromisoformat(work_order[1]).minute/60,
+            "duration": duration_in_secs(work_order[8])/(60*60),
+            "employeeId": work_order[9],
+            "employee": work_order[10]
+        } for work_order in workorders if work_order[4] == customer[0]]
+
+
+def get_workorders_by_id(req):
+	# sql = f'SELECT * FROM WorkOrders INNER JOIN Users u ON u.id=WorkOrders.EmployeeId INNER JOIN Services ON WorkOrders.ServiceId=Services.id INNER JOIN Users ON Users.name="{req.get("email")}"',
+	# req_date = req.get("date")[:req.get("date").index(".")]
+
+	# lower_boundary = datetime.fromisoformat(req_date).strftime("%Y-%m-%d")
+	# upper_boundary = datetime.fromisoformat(req_date).strftime("%Y-%m-%d")+"T18"
+
+	sql = f'SELECT WorkOrders.*,Services.*,Users.* FROM WorkOrders,Services,Users WHERE WorkOrders.id={req.get("id")} LIMIT 1'
+
+	mydb = mysql.connector.connect(host=db["host"], user=db["user"], password=db["password"], database=db["database"])
+	cursor = mydb.cursor()
+	cursor.execute(sql)
+	workorder = cursor.fetchone()
+
+	if not workorder:
+		return False
+
+	cust_sql = f'SELECT * FROM Users WHERE id="{workorder[4]}" LIMIT 1'
+
+	cursor.execute(cust_sql)
+	customer = cursor.fetchone()
+
+	if not customer:
+		return False
+
+	return {
+            "service": workorder[6],
+            "workOrderID": workorder[0],
+            "description": workorder[7],
+            "start": datetime.fromisoformat(workorder[1]).hour + datetime.fromisoformat(workorder[1]).minute/60,
+            "duration": duration_in_secs(workorder[8])/(60*60),
+            "employeeId": workorder[9],
+            "employee": workorder[10],
+            "customerId": customer[0],
+            "customerEmail": customer[1],
+        }
 
 
 

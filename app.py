@@ -3,7 +3,7 @@ from flask_cors import CORS
 import sys
 
 from initial_values import initial_employees, initial_services, initial_holidays
-from models import load_services, load_employees, load_holidays, initialize, get_user, get_users, get_services, create_workorder
+from models import load_services, load_employees, load_holidays, initialize, get_user, get_users, get_services, create_workorder, get_workorders, get_workorders_by_id
 
 # functions that will be executed from command line
 def cmd_map(command):
@@ -65,6 +65,32 @@ def fetch_services():
 	return res
 
 
+@app.route("/get/workorder/by/id", methods=["GET"])
+def get_workorder_by_id():
+	if request.is_json:
+		req = request.get_json()
+		workorder = get_workorders_by_id(req)
+
+		response_body = {"status": "success","workorder": workorder} if workorder else {"status": "failed", "message": "No no such workorder"}
+
+		res = make_response(jsonify(response_body), 200)
+		return res
+	else:
+		return make_response(jsonify({"status":"failed", "message": "Request body not formated properly"}), 400)
+
+
+@app.route("/get/workorder/by/email", methods=["GET", "POST"])
+def get_workorder_by_emaiil():
+	if request.is_json:
+		req = request.get_json()
+		workorders = get_workorders(req)
+
+		response_body = {"status": "success","workorders": workorders} if workorders else {"status": "failed", "message": "No workorders for this date"}
+
+		res = make_response(jsonify(response_body), 200)
+		return res
+	else:
+		return make_response(jsonify({"status":"failed", "message": "Request body not formated properly"}), 400)
 
 
 @app.route("/add/workorder", methods=["POST"])

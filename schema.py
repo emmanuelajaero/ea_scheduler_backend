@@ -29,3 +29,9 @@ tables_definitions = {
 	}
 
 
+
+
+# cursor.execute(f'SELECT * FROM WorkOrders INNER JOIN Users u ON u.id=WorkOrders.EmployeeId INNER JOIN Services ON WorkOrders.ServiceId=Services.id INNER JOIN Users ON Users.name="emmanuelajaero.ea@gmail.com"')
+
+
+
