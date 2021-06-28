@@ -174,6 +174,7 @@ def get_users(req):
 	users = [{
 		"id": user[0],
 		"email": user[1],
+		"employee": user[1],
 		"role": user[2],
 		"time": user[3]
 	} for user in cursor.fetchall()]
@@ -202,21 +203,16 @@ def get_services(service_id = None):
 		return {
 			"id": service[0],
 			"name": service[1],
+			"service": service[1],
 			"duration": service[2],
 		}
 
-	# users = [{
-	# 	"id": user[0],
-	# 	"email": user[1],
-	# 	"role": user[2],
-	# 	"time": user[3]
-	# } for user in cursor.fetchall()]
-
-
-	# if not users:
-	# 	return False
-	cursor.fetchall()
-	return [1,2,4]
+	return [{
+			"id": service[0],
+			"name": service[1],
+			"service": service[1],
+			"duration": duration_in_secs(service[2])/(60*60),
+		} for service in cursor.fetchall()]
 
 def duration_in_secs(duration_str):
 	duration_str = duration_str.lower().strip()
@@ -387,6 +383,7 @@ def create_workorder(req):
 	# order_info["startTime"] = datetime.fromisoformat(req.get("startTime").index())
 
 
+
 	try:
 		order_info["serviceId"] = req.get("serviceId")
 		order_info["customer_email"] = req.get("customer_email")
@@ -402,10 +399,14 @@ def create_workorder(req):
 		if not customer:
 			return {"inserted": False, "message": "Email wasn't created"}
 
+	# time_difference = datetime.strptime(order_info["startTime"].strftime("%Y-%m-%d"))-datetime.strptime(datetime.today().strftime("%Y-%m-%d"))
+	# print(time_difference.total_seconds())
+
 	for holiday in initial_holidays:
 		date_obj = datetime.strptime(holiday["date"], "%Y-%m-%d")
 		if date_obj.strftime("%Y-%m-%d") == order_info["startTime"].strftime("%Y-%m-%d"):
 			return {"inserted": False, "message": holiday["holiday"]}
+
 
 	if order_info["startTime"].strftime("%A") == "Sunday":
 		return {"inserted": False, "message": "We don't work on Sunday"}
